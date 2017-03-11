@@ -276,3 +276,58 @@ function Get-PrinterLocation{
             }
     }
 }
+function Get-ADSubnet{
+<#
+.Synopsis
+   Finds Active directory sites that match the requested subnet.
+.DESCRIPTION
+    Use this tool to find a corresponding active directory site for an IP address. Wildcards can be placed at any octet in this command. 
+.EXAMPLE
+   The Following gets the active directory site for the subnet 10.0.0.*. 
+   Get-ADSubnet -IPAddress 10.0.0.*
+.EXAMPLE
+   The following gets the active directory sites for multiple subnets
+   Get-ADSubnet -IPAddress 10.0.0.*,192.168.9.*
+#>
+    [CmdletBinding()]
+    Param
+    (
+        # Enter an IP Address Space. Ex: 10.0.0.*
+        [Parameter(Mandatory=$True,
+                   ValueFromPipeline=$True,
+                   ValueFromPipelineByPropertyName=$True,
+                   HelpMessage="Enter a Valid Computer Name",
+                   Position=0)]
+        #Need to consider what other cmdlets provide IP addresses in the pipeline.
+        #[Alias('Name')]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+
+        [string[]]$IPAddress
+    )
+    Begin{
+    #This grabs the configuration database in the active directory schema in a text format we can feed into the get-adobject command.
+    $Configuration = (Get-ADDomain | Select-Object SubordinateReferences).SubOrdinateReferences | Select-String -Pattern "Configuration"
+    }
+
+    Process{
+        #First loop for every IP address entered as a parameter.
+        foreach ($IP in $IPAddress){
+         $Sites = (get-adobject -filter 'ObjectClass -eq "site"' -SearchBase $Configuration -Properties siteObjectBL) | where {$_.siteObjectBL -like ("*" + $IP)}#).siteObjectBL
+           #Next we loop through the all of the possible return sites. This allows us to separate them in pipeline output for single objects.
+            foreach ($Site in $Sites){
+            #One more loop to go through all of the subnets that return in each site object. They are nested arrays, so this part separates each IP address to make clean pipeline output.
+                            foreach ($SubnetCN in $Site.siteObjectBL){
+                            #Cleanup the string and return only the IP and subnet
+                            $Subnet = $SubnetCN.split("="",")[1]
+                            #turn it into a a hash table and return as objects.
+                            $properties = @{'Site'=$Site.Name
+                                           'Subnet'=$Subnet
+                                            }
+                            $obj = New-Object -TypeName PSObject -Property $properties
+                            Write-Output $obj
+                            }
+            }
+        }
+    }
+}
