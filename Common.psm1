@@ -331,3 +331,71 @@ function Get-ADSubnet{
         }
     }
 }
+
+function Get-LoggedOnUser{
+<#
+.Synopsis
+   Retreives currently logged in domain users on remote computers
+.DESCRIPTION
+   Retreives the list of currently logged in computers in the WMI object Win32_loggedonuser and outputs domain users logged in that are not the current user running the script.
+.EXAMPLE
+   Get-LoggedOn -Computername computer1
+.EXAMPLE
+   get-adcomputer -filter {name -like "*computer*"} | select -expandproperty name | get-loggedon
+  #>
+    [CmdletBinding()]
+    [Alias()]
+    [OutputType([String])]
+    Param
+    (
+        # Param1 help description
+        [Parameter(Mandatory=$true, 
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true, 
+                   ValueFromRemainingArguments=$false, 
+                   Position=0)]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [Alias("name","cn","computer")] 
+        [string[]]$computername
+    )
+
+    Begin
+    {
+    #Regex Expression to match the domain names and the user name
+    $regex = '.+Domain="(.+)",Name="(.+)"$'
+    #environment variable for the current user to filter later
+    $currentuser = $env:username
+    }
+    Process
+    {
+        try
+        {
+        foreach ($computer in $computername)
+            {
+                #Enumerate the logged in users
+                $users = Get-WmiObject -ComputerName $computer -Class Win32_LoggedOnUser -ErrorAction Stop | Select Antecedent -unique 
+                #Check each output
+                foreach($user in $users)
+                    {
+                        #Match against the regex
+                        $user.antecedent -match $regex > $null
+                        #If the matches variable contains the computeraname (local accounts) or the user running the command, do not output
+                        if ($matches[1] -ne $computer -and $matches[2] -notlike $currentuser)
+                        {
+                            $properties = @{'ComputerName'=$computer
+                                            'User'=$matches[2]}
+                            $obj = New-Object -TypeName PSObject -Property $properties
+                            Write-Output $obj
+                        }
+                        #clear the matches variable for the next user
+                        $matches.clear()
+                    }
+            }
+        }
+        catch
+        {
+        Write-Error "Unable to connect to $computer to retreive user names"
+        }
+    }
+}
