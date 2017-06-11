@@ -399,3 +399,63 @@ function Get-LoggedOnUser{
         }
     }
 }
+
+function Get-ADPrinter 
+{
+<#
+.SYNOPSIS
+    Finds printers that have been published in active directory.
+.DESCRIPTION
+    Finds printers published in AD and returns information about the printer. Things like the server they are on, portname, UNC path, Driver, and Location.
+.EXAMPLE
+    Get-ADPrinter -Printer TestPrinter01
+.EXAMPLE
+    Get-ADPrinter -Printer TestPrinter01,TestPrinter02,TestPrinter03
+#>
+    [CmdletBinding()]
+    [Alias()]
+    [OutputType([String])]
+    Param (
+        # Param1 help description
+        [Parameter(Mandatory=$true,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Alias("CN")] 
+        [string[]]$Printer
+    )
+    
+    process 
+    {
+        foreach ($Print in $Printer)
+        {
+            try 
+            {
+                    $Print = "*$Print"
+                    $DN = Get-ADObject -Filter {ObjectClass -eq "printQueue" -and Name -like $Print} -Properties printerName,serverName,portName,uNCName,driverName,location
+                    $properties = @{'Printer'=$DN.printerName
+                                    'Server'=$DN.serverName
+                                    'PortName'=$DN.portName
+                                    'UNC'=$DN.uNCName
+                                    'Driver'=$DN.driverName
+                                    'Location'=$DN.location}
+                    $obj = New-Object -TypeName PSObject -Property $properties
+                    Write-Output $obj
+            }
+            
+            catch 
+            {
+                    Write-Warning "No Valid Printer found"
+                    $properties = @{'Printer'=$Print
+                                    'Server'=$Null
+                                    'PortName'=$Null
+                                    'UNC'=$Null
+                                    'Driver'=$Null
+                                    'Location'=$Null}
+                    $obj = New-Object -TypeName PSObject -Property $properties
+                    Write-Output $obj
+            }
+        }    
+    }
+    
+}
