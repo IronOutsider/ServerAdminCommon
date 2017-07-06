@@ -459,3 +459,68 @@ function Get-ADPrinter
     }
     
 }
+
+function Get-ADFolderACL {
+<#
+.SYNOPSIS
+    Gets Active Directory Groups and Users of a file directory
+.EXAMPLE
+    This example gets the the top level groups and users ACLs.
+    Get-ADFolderACL -Path \\Test-Server\Folder Location
+.EXAMPLE
+    This example will get all users and recurse through the groups to return the users in those groups.
+    Get-ADFolderACL -Path \\Test-Server\Folder -Recurse
+#>
+    [CmdletBinding()]
+    Param (
+        # Enter a valid local or UNC path
+        [Parameter(Mandatory=$true,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [string[]]$Path,
+        
+        # Return all users of the groups
+        [Parameter(Mandatory=$false,
+                    Position=0)]
+        [switch]$Recurse
+    )
+    
+    process {
+        foreach ($Pat in $Path)
+        {
+            Write-Verbose "Obtaining ACLS"
+            $acls = Get-ACL -Path $Pat | ForEach-Object {$_.Access}
+            if ($Recurse)
+            {
+            $Users = foreach ($acl in $acls)
+                {   
+                    $Filter = $acl.identityreference.tostring().split("\",[System.StringSplitOptions]::RemoveEmptyEntries)[1]
+                    if ($Filter -ne $null)
+                        {
+                        Write-Verbose "Getting $Filter"
+                        $User = Get-ADGroupMember -Identity $Filter -Recursive
+                        $User = $User | Select-Object -Property Name,distinguishedName,ObjectClass
+                        Write-Output $User
+                        }
+                }
+                $Users = $Users | Select-Object -Property Name,distinguishedName,ObjectClass -Unique
+                Write-Output $Users
+            } 
+            else
+            {
+                    foreach ($acl in $acls)
+                    {
+                        $Filter = $acl.identityreference.tostring().split("\",[System.StringSplitOptions]::RemoveEmptyEntries)[1]
+                        if ($Filter -ne $null)
+                            {
+                            Write-Verbose "Getting $Filter"
+                            $Users = Get-ADObject -Filter {SamAccountName -eq $Filter}
+                            $Users = $Users | Select-Object -Property Name,distinguishedName,ObjectClass -Unique
+                            Write-Output $Users
+                            }
+                    }
+            }     
+        }
+    }
+}
