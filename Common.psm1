@@ -1,4 +1,4 @@
-﻿#Common Powershell Functions
+#Common Powershell Functions
 #Written by Luis Orta
 #Contains a few tools here and there to help with time consuming tasks.
 function Get-OpenFile{
@@ -14,7 +14,7 @@ function Get-OpenFile{
 .EXAMPLE
    Get-ADComputer fileserver1 | Select-Object -Property DNSHostName | Get-OpenFiles -FileName "docx"
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/01/21/get-openfiles/')]
     param (
         # valid fileserver name here. Can accept multiple values
         [Parameter (Mandatory=$true,
@@ -71,7 +71,7 @@ function Get-AddRemoveProgram{
 .EXAMPLE
    Get-ADComputer server1 | Select-Object -Property DNSHostname | Get-AddRemovePrograms -ProgramName *Microsoft*
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/01/26/get-addremoveprograms/')]
     Param(
         # valid server name here. Can accept multiple values
         [Parameter(Mandatory=$True,
@@ -139,7 +139,7 @@ Description
 -----------
 Returns local administrators of the remote computer.
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/02/19/get-netlocalgroup/')]
     Param(
         # ComputerName
         [Parameter(Mandatory=$false, 
@@ -165,21 +165,15 @@ Returns local administrators of the remote computer.
         foreach ($Computer in $Computername){
                 #Connect to remote computer and begin mining data
                 $ADGroup = Invoke-Command -ComputerName $Computer -ScriptBlock {
-                $Computer = $env:COMPUTERNAME
-                #Make ADSI Connection to local computer and begin enumerating Objects
-                $ADSIComputer = [ADSI]("WinNT://$Computer,computer")
-                $group = $ADSIComputer.psbase.children.find('Administrators',  'Group')
-                $ADGroup = $group.psbase.invoke("members")  | ForEach {
-                                                                      $_.GetType().InvokeMember("Name",  'GetProperty',  $null,  $_, $null)
-                                                                      }
+                net localgroup $args[0]
                 Write-Output $ADGroup
-                }
-                    foreach($Group in $ADGroup) {
-                            #Return as hash table and turn into PSObjects.
-                            $properties = @{ComputerName = $Computer
-                                            UserName = $Group}
-                            $obj = New-Object -TypeName PSObject -Property $properties
-                            Write-Output $obj
+                } -ArgumentList $Group
+                    for ($i=6; $i -lt $ADGroup.length-3; $i++){
+                        #Return as hash table and turn into PSObjects.
+                        $properties = @{ComputerName = $Computer
+                                                UserName = $ADGroup[$i]}
+                        $obj = New-Object -TypeName PSObject -Property $properties
+                        Write-Output $obj
                     }
                 
  
@@ -201,7 +195,7 @@ function Set-PrinterLocation{
    The following sets the location on all local print queues to Redmond, WA
    Set-PrinterLocation -Server Printserver1 -Location "Redmond, WA"
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/02/19/get-printerlocation-set-printerlocation/')]
     Param
     (
         # A Valid Print Server Name
@@ -248,7 +242,7 @@ function Get-PrinterLocation{
    The following gets the location on all local print queues
    Get-PrinterLocation
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/02/19/get-printerlocation-set-printerlocation/')]
     Param
     (
         # Server
@@ -289,7 +283,7 @@ function Get-ADSubnet{
    The following gets the active directory sites for multiple subnets
    Get-ADSubnet -IPAddress 10.0.0.*,192.168.9.*
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/03/11/get-adsubnet/')]
     Param
     (
         # Enter an IP Address Space. Ex: 10.0.0.*
@@ -343,8 +337,7 @@ function Get-LoggedOnUser{
 .EXAMPLE
    get-adcomputer -filter {name -like "*computer*"} | select -expandproperty name | get-loggedon
   #>
-    [CmdletBinding()]
-    [Alias()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/06/02/get-loggedonuser/')]
     [OutputType([String])]
     Param
     (
@@ -412,8 +405,7 @@ function Get-ADPrinter
 .EXAMPLE
     Get-ADPrinter -Printer TestPrinter01,TestPrinter02,TestPrinter03
 #>
-    [CmdletBinding()]
-    [Alias()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/06/11/get-adprinter')]
     [OutputType([String])]
     Param (
         # Param1 help description
@@ -433,14 +425,17 @@ function Get-ADPrinter
             {
                     $Print = "*$Print"
                     $DN = Get-ADObject -Filter {ObjectClass -eq "printQueue" -and Name -like $Print} -Properties printerName,serverName,portName,uNCName,driverName,location
-                    $properties = @{'Printer'=$DN.printerName
-                                    'Server'=$DN.serverName
-                                    'PortName'=$DN.portName
-                                    'UNC'=$DN.uNCName
-                                    'Driver'=$DN.driverName
-                                    'Location'=$DN.location}
-                    $obj = New-Object -TypeName PSObject -Property $properties
-                    Write-Output $obj
+                    foreach ($D in $DN)
+                    {
+                        $properties = @{'Printer'=$D.printerName
+                                        'Server'=$D.serverName
+                                        'PortName'=$D.portName
+                                        'UNC'=$D.uNCName
+                                        'Driver'=$D.driverName
+                                        'Location'=$D.location}
+                        $obj = New-Object -TypeName PSObject -Property $properties
+                        Write-Output $obj
+                    }
             }
             
             catch 
@@ -459,7 +454,6 @@ function Get-ADPrinter
     }
     
 }
-
 function Get-ADFolderACL {
 <#
 .SYNOPSIS
