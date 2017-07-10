@@ -518,3 +518,152 @@ function Get-ADFolderACL {
         }
     }
 }
+function Get-GlobalPrinter {
+<#
+.SYNOPSIS
+    Gets Globally Installed printers on local or remote computers.
+.EXAMPLE
+    This example gets all printers on local computer.
+    Get-GlobalPrinter
+
+Printer      UNC                            Server            Computername  
+-------      ---                            ------            ------------  
+TestPrinter1 \\Serv1.test1.com\TestPrinter1 \\Serv1.test1.com TestPC01
+TestPrinter2 \\Serv2.test1.com\TestPrinter2 \\Serv2.test1.com TestPC01
+.EXAMPLE
+    This example will get the printer TestPrinter2 from the remote computer Test-PC02
+    Get-GlobalPrinter -Computername Test-PC01 -Printer TestPrinter2
+Printer      UNC                            Server            Computername  
+-------      ---                            ------            ------------  
+TestPrinter2 \\Serv2.test1.com\TestPrinter2 \\Serv2.test1.com TestPC01
+#>
+    [CmdletBinding()]
+    Param (
+        # Provide a valid computername
+        [Parameter(Mandatory=$false,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Alias("cn")] 
+        [string[]]$Computername = 'localhost',
+		# Provide a valid printer name
+        [Parameter(Mandatory=$false,
+                   Position=1)]
+        [string[]]$Printer = '*')
+    
+    process 
+    {
+        foreach($Computer in $Computername)
+        {
+            Write-Verbose "Invoking Command to get printers on $Computer"
+            $Printers = Invoke-Command -ComputerName $Computer -ScriptBlock{
+                $Printers = Get-ChildItem "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Print\Connections"
+                foreach ($Printer in $Printers)
+                {
+                    $properties = @{'Printer'=$Printer.GetValue("Printer").Split("\")[-1]
+									'UNC'=$Printer.GetValue("Printer")
+									'Server'=$Printer.GetValue("Server")
+                                    'Computername'=$env:COMPUTERNAME}
+                    $obj = New-Object -TypeName PSObject -Property $properties
+                    Write-Output $obj | Where-Object Printer -like $args[0]
+                }
+            } -ArgumentList $Printer
+            foreach ($Print in $Printers)
+				{
+					Write-Output $Print | Select-Object Printer,UNC,Server,ComputerName 
+				} 
+        }
+    }
+}
+function Install-GlobalPrinter 
+{
+<#
+.SYNOPSIS
+    Installs global printers on local or remote computers.
+.EXAMPLE
+    This example installs a global printer on the local computer.
+    Install-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1
+.EXAMPLE
+    This example installs multiple global printers on the local computer.
+    Install-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
+.EXAMPLE
+    This example installs multiple global printers on a remote computer.
+    Install-GlobalPrinter -Computername TestPC01 -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
+#>
+    [CmdletBinding()]
+    Param (
+        # Enter a valid computer name
+        [Parameter(Mandatory=$false,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Alias("cn")] 
+        [string[]]$ComputerName = 'localhost',
+        # Enter a valid UNC path to a printer
+        [Parameter(Mandatory=$false,
+                   Position=1,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+       [string[]]$UNC)      
+    
+    process 
+    {
+        foreach($Computer in $Computername)
+        {
+            Write-Verbose "Invoking Command to install printers on $Computer"
+            Invoke-Command -ComputerName $Computer -ScriptBlock{
+                foreach($arg in $args)
+                {
+                    rundll32 printui.dll PrintUIEntry /q /ga /n $arg
+                }
+                    
+            } -ArgumentList $UNC
+        }
+    }
+}
+function Remove-GlobalPrinter 
+{
+<#
+.SYNOPSIS
+    Removes global printers on local or remote computers.
+.EXAMPLE
+    This example removes a global printer on the local computer.
+    Remove-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1
+.EXAMPLE
+    This example removes multiple global printers on the local computer.
+    Remove-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
+.EXAMPLE
+    This example removes multiple global printers on a remote computer.
+    Remove-GlobalPrinter -Computername TestPC01 -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
+#>
+    [CmdletBinding()]
+    Param (
+        # Param1 help description
+        [Parameter(Mandatory=$false,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Alias("cn")] 
+        [string[]]$Computername = 'localhost',
+        # Param1 help description
+        [Parameter(Mandatory=$false,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+       [string[]]$UNC)      
+    
+    process 
+    {
+        foreach($Computer in $Computername)
+        {
+            Write-Verbose "Invoking Command to remove printers on $Computer"
+            Invoke-Command -ComputerName $Computer -ScriptBlock{
+                foreach($arg in $args)
+                {
+                    rundll32 printui.dll PrintUIEntry /q /gd /n $arg
+                }
+                    
+            } -ArgumentList $UNC
+        }
+    }
+}
