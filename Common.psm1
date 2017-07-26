@@ -518,6 +518,70 @@ function Get-ADFolderACL {
         }
     }
 }
+function Get-ADFolderACL {
+<#
+.SYNOPSIS
+    Gets Active Directory Groups and Users of a file directory
+.EXAMPLE
+    This example gets the the top level groups and users ACLs.
+    Get-ADFolderACL -Path \\Test-Server\Folder Location
+.EXAMPLE
+    This example will get all users and recurse through the groups to return the users in those groups.
+    Get-ADFolderACL -Path \\Test-Server\Folder -Recurse
+#>
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/07/25/get-adfolderacl/')]
+    Param (
+        # Enter a valid local or UNC path
+        [Parameter(Mandatory=$true,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [string[]]$Path,
+        
+        # Return all users of the groups
+        [Parameter(Mandatory=$false,
+                    Position=0)]
+        [switch]$Recurse
+    )
+    
+    process {
+        foreach ($Pat in $Path)
+        {
+            Write-Verbose "Obtaining ACLS"
+            $acls = Get-ACL -Path $Pat | ForEach-Object {$_.Access}
+            if ($Recurse)
+            {
+            $Users = foreach ($acl in $acls)
+                {   
+                    $Filter = $acl.identityreference.tostring().split("\",[System.StringSplitOptions]::RemoveEmptyEntries)[1]
+                    if ($Filter -ne $null)
+                        {
+                        Write-Verbose "Getting $Filter"
+                        $User = Get-ADGroupMember -Identity $Filter -Recursive
+                        $User = $User | Select-Object -Property Name,distinguishedName,ObjectClass
+                        Write-Output $User
+                        }
+                }
+                $Users = $Users | Select-Object -Property Name,distinguishedName,ObjectClass -Unique
+                Write-Output $Users
+            } 
+            else
+            {
+                    foreach ($acl in $acls)
+                    {
+                        $Filter = $acl.identityreference.tostring().split("\",[System.StringSplitOptions]::RemoveEmptyEntries)[1]
+                        if ($Filter -ne $null)
+                            {
+                            Write-Verbose "Getting $Filter"
+                            $Users = Get-ADObject -Filter {SamAccountName -eq $Filter}
+                            $Users = $Users | Select-Object -Property Name,distinguishedName,ObjectClass -Unique
+                            Write-Output $Users
+                            }
+                    }
+            }     
+        }
+    }
+}
 function Get-GlobalPrinter {
 <#
 .SYNOPSIS
@@ -537,7 +601,7 @@ Printer      UNC                            Server            Computername
 -------      ---                            ------            ------------  
 TestPrinter2 \\Serv2.test1.com\TestPrinter2 \\Serv2.test1.com TestPC01
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/07/26/global-printer-bundle/')]
     Param (
         # Provide a valid computername
         [Parameter(Mandatory=$false,
@@ -575,22 +639,22 @@ TestPrinter2 \\Serv2.test1.com\TestPrinter2 \\Serv2.test1.com TestPC01
         }
     }
 }
-function Install-GlobalPrinter 
+function Add-GlobalPrinter 
 {
 <#
 .SYNOPSIS
-    Installs global printers on local or remote computers.
+    Adds global printers on local or remote computers.
 .EXAMPLE
-    This example installs a global printer on the local computer.
-    Install-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1
+    This example Adds a global printer on the local computer.
+    Add-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1
 .EXAMPLE
-    This example installs multiple global printers on the local computer.
-    Install-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
+    This example Adds multiple global printers on the local computer.
+    Add-GlobalPrinter -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
 .EXAMPLE
-    This example installs multiple global printers on a remote computer.
-    Install-GlobalPrinter -Computername TestPC01 -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
+    This example Adds multiple global printers on a remote computer.
+    Add-GlobalPrinter -Computername TestPC01 -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/07/26/global-printer-bundle/')]
     Param (
         # Enter a valid computer name
         [Parameter(Mandatory=$false,
@@ -610,7 +674,7 @@ function Install-GlobalPrinter
     {
         foreach($Computer in $Computername)
         {
-            Write-Verbose "Invoking Command to install printers on $Computer"
+            Write-Verbose "Invoking Command to Add printers on $Computer"
             Invoke-Command -ComputerName $Computer -ScriptBlock{
                 foreach($arg in $args)
                 {
@@ -636,7 +700,7 @@ function Remove-GlobalPrinter
     This example removes multiple global printers on a remote computer.
     Remove-GlobalPrinter -Computername TestPC01 -UNC \\Serv1.test1.com\TestPrinter1,\\Serv2.test1.com\TestPrinter2
 #>
-    [CmdletBinding()]
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/07/26/global-printer-bundle/')]
     Param (
         # Param1 help description
         [Parameter(Mandatory=$false,
