@@ -74,12 +74,12 @@ function Get-AddRemoveProgram{
     [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/01/26/get-addremoveprograms/')]
     Param(
         # valid server name here. Can accept multiple values
-        [Parameter(Mandatory=$True,
+        [Parameter(Mandatory=$False,
                    ValueFromPipeline=$True,
                    ValueFromPipelineByPropertyName=$True,
                    HelpMessage="Enter a Valid Computer Name")]
         [Alias('Hostname','DNSHostName')]
-        [string[]]$ComputerName,
+        [string[]]$ComputerName = "localhost",
 
         [Parameter(Mandatory=$False,
                    HelpMessage="Enter a part of the program name Example:Office")]
@@ -89,32 +89,26 @@ function Get-AddRemoveProgram{
                 foreach ($computer in $ComputerName){
             try{
             $programs = Invoke-Command -ComputerName $computer{
-             Param($ProgramName)
              $32bit = Get-ItemProperty HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*
              $64bit = Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*
-             return $32bit + $64bit} -ArgumentList $ProgramName -ErrorAction Stop
-             #$programs = $32bit + $64bit
+             return $32bit + $64bit} -ErrorAction Stop
 
     foreach ($program in $programs){
-                    $properties = @{ComputerName = $computer
-                                    ProgramName = $program.DisplayName
-                                    Publisher = $program.Publisher
-                                    Version = $program.DisplayVersion}
-                    $obj = New-Object -TypeName PSObject -Property $properties
-                    Write-Output $obj | Where-Object {$obj -like $ProgramName}
-                    }
-
+                $program = Write-Output $program | Where-Object -Property Displayname -like $ProgramName
+                    if ($program.DisplayName -ne $Null)
+                        {
+                        $properties = @{ComputerName = $computer
+                                        ProgramName = $program.DisplayName
+                                        Publisher = $program.Publisher
+                                        Version = $program.DisplayVersion
+                                        UninstallString = $program.UninstallString}
+                        $obj = New-Object -TypeName PSObject -Property $properties
+                        Write-Output $obj
+                        }
+    }    
             }
 
-        catch{
-                    $properties = @{ComputerName = $computer
-                                    ProgramName = $null
-                                    Publisher = $null
-                                    Version = $null}
-                    $obj = New-Object -TypeName PSObject -Property $properties
-                    Write-Output $obj
-        
-
+        catch{ Write-Warning "$Computer was not reachable."
         }
 
    }
