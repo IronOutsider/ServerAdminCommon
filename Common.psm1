@@ -725,3 +725,67 @@ function Remove-GlobalPrinter
         }
     }
 }
+
+function Test-LocalCredential {
+<#
+.SYNOPSIS
+    Tests local user account passwords against remote computers to verify credentials
+.EXAMPLE
+    $Cred = Get-Credential
+    Test-LocalCredential -Credential $Cred -ComputerName TestServ1
+.EXAMPLE
+    Test-LocalCredential -Computername TestServ1, TestServ2, TestServ3
+.INPUTS
+    Inputs to this cmdlet (if any)
+.OUTPUTS
+    Output from this cmdlet (if any)
+.NOTES
+    General notes
+.COMPONENT
+    The component this cmdlet belongs to
+.ROLE
+    The role this cmdlet belongs to
+.FUNCTIONALITY
+    The functionality that best describes this cmdlet
+#>
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/')]
+    Param (
+        # Enter a valid credential
+        [Parameter(Mandatory=$true,
+                   Position=0)]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [System.Management.Automation.PSCredential]$Credential = (Get-Credential),
+        
+        # Enter a computer name.
+        [Parameter(Mandatory=$false,
+                   Position=1)]
+        [Alias("name","cn","computer")] 
+        [String[]]$ComputerName = $env:COMPUTERNAME
+    )
+    
+    begin 
+    {
+        Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+    }
+    
+    process 
+    {
+        foreach ($Computer in $ComputerName) 
+        {
+            $DirectoryObject = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('machine',$Computer)
+            $Check = $DirectoryObject.ValidateCredentials($Credential.GetNetworkCredential().Username,$Credential.GetNetworkCredential().Password)
+
+            $Obj = New-Object -TypeName PSCustomObject -Property @{
+                ComputerName =  $Computer
+                UserName = $Credential.GetNetworkCredential().Username
+                CredentialCheck = $Check
+            }
+            Write-Output $Obj
+        }
+    }
+    
+    end 
+    {
+    }
+}
