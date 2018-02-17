@@ -857,5 +857,7 @@ function Invoke-ACLMapping {
     
     end 
     {
+        #Interesting filter $data | where {($_.state -eq "Listening" -and $_.foreignport -eq "0" -and $_.localaddress -ne "0.0.0.0" -and $_.LocalAddress -ne '[::]') -or ($_.proto -eq "UDP" -and $_.localaddress -ne "0.0.0.0" -and $_.LocalAddress -ne '[::]')} | ft
+        
     }
 }
