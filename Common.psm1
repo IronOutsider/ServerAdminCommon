@@ -784,6 +784,76 @@ function Test-LocalCredential {
             Write-Output $Obj
         }
     }
+}
+
+function Invoke-ACLMapping {
+<#
+.SYNOPSIS
+    Short description
+.DESCRIPTION
+    Long description
+.EXAMPLE
+    Example of how to use this cmdlet
+.EXAMPLE
+    Another example of how to use this cmdlet
+.INPUTS
+    Inputs to this cmdlet (if any)
+.OUTPUTS
+    Output from this cmdlet (if any)
+.NOTES
+    General notes
+.COMPONENT
+    The component this cmdlet belongs to
+.ROLE
+    The role this cmdlet belongs to
+.FUNCTIONALITY
+    The functionality that best describes this cmdlet
+#>
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/')]
+    Param (
+        # Param1 help description
+        [Parameter(Position=0)]
+        [Alias("p1")] 
+        $Computername = "LocalHost"
+    )
+    
+    begin 
+    {
+    }
+    
+    process 
+    {
+        foreach ($Computer in $Computername) 
+        {
+            Invoke-Command -ComputerName $Computer -ScriptBlock {
+                $Netstats = NETSTAT.EXE -ANO
+                for ($i = 4; $i -lt $Netstats.Count; $i++) 
+                {
+                    $split = $Netstats[$i].split("",[System.StringSplitOptions]::RemoveEmptyEntries)
+                    if ($split[0] -eq "TCP")
+                    {
+                        $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
+                                                                           LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
+                                                                           LocalPort = $split[1].split(":")[-1]
+                                                                           ForeignAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
+                                                                           ForeignPort = $split[2].split(":")[-1]
+                                                                           State = $Split[3]
+                                                                           ProcessName = (Get-Process -Id $Split[4]).Name}
+                    }
+                    if ($split[0] -eq "UDP"){
+                        $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
+                                                                           LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
+                                                                           LocalPort = $split[1].split(":")[-1]
+                                                                           ForeignAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
+                                                                           ForeignPort = $split[2].split(":")[-1]
+                                                                           State = $null
+                                                                           ProcessName = (Get-Process -Id $Split[3]).Name}
+                    }
+                    write-output $obj
+                }  
+            }
+        }
+    }
     
     end 
     {
