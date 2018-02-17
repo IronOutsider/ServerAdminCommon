@@ -835,8 +835,8 @@ function Invoke-ACLMapping {
                         $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
                                                                            LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
                                                                            LocalPort = $split[1].split(":")[-1]
-                                                                           ForeignAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
-                                                                           ForeignPort = $split[2].split(":")[-1]
+                                                                           RemoteAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
+                                                                           RemotePort = $split[2].split(":")[-1]
                                                                            State = $Split[3]
                                                                            ProcessName = (Get-Process -Id $Split[4]).Name}
                     }
@@ -844,8 +844,8 @@ function Invoke-ACLMapping {
                         $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
                                                                            LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
                                                                            LocalPort = $split[1].split(":")[-1]
-                                                                           ForeignAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
-                                                                           ForeignPort = $split[2].split(":")[-1]
+                                                                           RemoteAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
+                                                                           RemotePort = $split[2].split(":")[-1]
                                                                            State = $null
                                                                            ProcessName = (Get-Process -Id $Split[3]).Name}
                     }
