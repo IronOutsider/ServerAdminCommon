@@ -320,16 +320,16 @@ function Get-ADSubnet{
     }
 }
 
-function Get-LoggedOnUser{
+function Get-LoggedOnUser {
 <#
 .Synopsis
    Retreives currently logged in domain users on remote computers
 .DESCRIPTION
    Retreives the list of currently logged in computers in the WMI object Win32_loggedonuser and outputs domain users logged in that are not the current user running the script.
 .EXAMPLE
-   Get-LoggedOn -Computername computer1
+   Get-LoggedOnUser -Computername computer1
 .EXAMPLE
-   get-adcomputer -filter {name -like "*computer*"} | select -expandproperty name | get-loggedon
+   get-adcomputer -filter {name -like "*computer*"} | select -expandproperty name | get-loggedonUser
   #>
     [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/06/02/get-loggedonuser/')]
     [OutputType([String])]
@@ -361,7 +361,7 @@ function Get-LoggedOnUser{
         foreach ($computer in $computername)
             {
                 #Enumerate the logged in users
-                $users = Get-WmiObject -ComputerName $computer -Class Win32_LoggedOnUser -ErrorAction Stop | Select Antecedent -unique 
+                $users = Get-CimInstance -ComputerName tas-isd-epic02 -ClassName Win32_LoggedOnUser | Select-Object Antecedent -Unique 
                 #Check each output
                 foreach($user in $users)
                     {
