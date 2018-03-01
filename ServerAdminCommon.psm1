@@ -735,22 +735,10 @@ function Test-LocalCredential {
     Test-LocalCredential -Credential $Cred -ComputerName TestServ1
 .EXAMPLE
     Test-LocalCredential -Computername TestServ1, TestServ2, TestServ3
-.INPUTS
-    Inputs to this cmdlet (if any)
-.OUTPUTS
-    Output from this cmdlet (if any)
-.NOTES
-    General notes
-.COMPONENT
-    The component this cmdlet belongs to
-.ROLE
-    The role this cmdlet belongs to
-.FUNCTIONALITY
-    The functionality that best describes this cmdlet
 #>
     [CmdletBinding(HelpUri = 'https://luisrorta.com/')]
     Param (
-        # Enter a valid credential
+        # Enter valid credentials using get-credential
         [Parameter(Mandatory=$true,
                    Position=0)]
         [ValidateNotNull()]
@@ -760,32 +748,79 @@ function Test-LocalCredential {
         # Enter a computer name.
         [Parameter(Mandatory=$false,
                    Position=1)]
-        [Alias("name","cn","computer")] 
+        [Alias("name","cn","computer","PSComputerName")] 
         [String[]]$ComputerName = $env:COMPUTERNAME
     )
-    
-    begin 
-    {
-        Add-Type -AssemblyName System.DirectoryServices.AccountManagement
-    }
-    
     process 
     {
         foreach ($Computer in $ComputerName) 
         {
-            $DirectoryObject = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('machine',$Computer)
-            $Check = $DirectoryObject.ValidateCredentials($Credential.GetNetworkCredential().Username,$Credential.GetNetworkCredential().Password)
-
-            $Obj = New-Object -TypeName PSCustomObject -Property @{
-                ComputerName =  $Computer
-                UserName = $Credential.GetNetworkCredential().Username
-                CredentialCheck = $Check
+            Invoke-Command -ComputerName $Computer -ScriptBlock {
+                $Credential = $Using:Credential
+                Add-Type -AssemblyName System.DirectoryServices.AccountManagement
+                $DirectoryObject = New-Object System.DirectoryServices.AccountManagement.PrincipalContext('machine','localhost')
+                $Check = $DirectoryObject.ValidateCredentials($Credential.GetNetworkCredential().Username,$Credential.GetNetworkCredential().Password)
+                $Obj = New-Object -TypeName PSCustomObject -Property @{
+                    UserName = $Credential.GetNetworkCredential().Username
+                    CredentialCheck = $Check
+                }
+                Write-Output $Obj
             }
-            Write-Output $Obj
+
         }
     }
+}
+
+function Get-Netstat {
+<#
+.SYNOPSIS
+    A powershell version of the command line utility netstat.
+.DESCRIPTION
+    Uses invoke-command to run netstat remotely and perform string handling to create powershell objects.
+.EXAMPLE
+    Get-Netstat -Computername TestServ1, TestServ2
+#>
+    [CmdletBinding(HelpUri = 'https://luisrorta.com/')]
+    Param (
+        # Enter a valid computer Name
+        [Parameter(Position=0)]
+        [Alias("p1")] 
+        [string[]]$Computername = "LocalHost"
+    )
     
-    end 
+    process 
     {
+        foreach ($Computer in $Computername) 
+        {
+            Invoke-Command -ComputerName $Computer -ScriptBlock {
+                $Netstats = NETSTAT.EXE -ANO
+                for ($i = 4; $i -lt $Netstats.Count; $i++) 
+                {
+                    $split = $Netstats[$i].split("",[System.StringSplitOptions]::RemoveEmptyEntries)
+                    if ($split[0] -eq "TCP")
+                    {
+                        $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
+                                                                           LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
+                                                                           LocalPort = $split[1].split(":")[-1]
+                                                                           RemoteAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
+                                                                           RemotePort = $split[2].split(":")[-1]
+                                                                           State = $split[3]
+                                                                           ProcessName = (Get-Process -Id $split[4]).Name
+                                                                           ProcessID = $split[4]}
+                    }
+                    if ($split[0] -eq "UDP"){
+                        $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
+                                                                           LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
+                                                                           LocalPort = $split[1].split(":")[-1]
+                                                                           RemoteAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
+                                                                           RemotePort = $split[2].split(":")[-1]
+                                                                           State = $null
+                                                                           ProcessName = (Get-Process -Id $Split[3]).Name
+                                                                           ProcessID = $split[4]}
+                    }
+                    write-output $obj
+                }  
+            }
+        }
     }
 }
