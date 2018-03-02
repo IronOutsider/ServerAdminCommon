@@ -330,13 +330,15 @@ function Get-LoggedOnUser {
    Get-LoggedOnUser -Computername computer1
 .EXAMPLE
    get-adcomputer -filter {name -like "*computer*"} | select -expandproperty name | get-loggedonUser
+.EXAMPLE
+   Get-LoggedonUser -Computername computer1 -includelocal
   #>
     [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/06/02/get-loggedonuser/')]
     [OutputType([String])]
     Param
     (
         # Param1 help description
-        [Parameter(Mandatory=$true, 
+        [Parameter(Mandatory=$false, 
                    ValueFromPipeline=$true,
                    ValueFromPipelineByPropertyName=$true, 
                    ValueFromRemainingArguments=$false, 
@@ -344,16 +346,13 @@ function Get-LoggedOnUser {
         [ValidateNotNull()]
         [ValidateNotNullOrEmpty()]
         [Alias("name","cn","computer")] 
-        [string[]]$computername
+        [string[]]$Computername = "localhost",
+
+        [Parameter(Mandatory=$false,
+                   Position=1)]
+        [Switch]$IncludeLocal
     )
 
-    Begin
-    {
-    #Regex Expression to match the domain names and the user name
-    $regex = '.+Domain="(.+)",Name="(.+)"$'
-    #environment variable for the current user to filter later
-    $currentuser = $env:username
-    }
     Process
     {
         try
@@ -361,23 +360,33 @@ function Get-LoggedOnUser {
         foreach ($computer in $computername)
             {
                 #Enumerate the logged in users
-                $users = Get-CimInstance -ComputerName tas-isd-epic02 -ClassName Win32_LoggedOnUser | Select-Object Antecedent -Unique 
-                #Check each output
-                foreach($user in $users)
+                $users = Get-CimInstance -ComputerName $computer -ClassName Win32_LoggedOnUser | Select-Object Antecedent -Unique 
+                #Check each output and filter out the current user and local service accounts.
+                if ($IncludeLocal) 
+                {
+                    foreach($user in $users)
                     {
-                        #Match against the regex
-                        $user.antecedent -match $regex > $null
-                        #If the matches variable contains the computeraname (local accounts) or the user running the command, do not output
-                        if ($matches[1] -ne $computer -and $matches[2] -notlike $currentuser)
+                        if ($user.Antecedent.name -ne $env:username) 
                         {
-                            $properties = @{'ComputerName'=$computer
-                                            'User'=$matches[2]}
-                            $obj = New-Object -TypeName PSObject -Property $properties
+                            $obj = New-Object -TypeName PSCustomObject -Property @{'ComputerName' = $user.Antecedent.PSComputerName
+                                'Name' = $user.Antecedent.Name
+                                'Domain' = $user.Antecedent.Domain}
                             Write-Output $obj
                         }
-                        #clear the matches variable for the next user
-                        $matches.clear()
+                    }    
+                }
+                else {
+                    foreach($user in $users)
+                    {
+                        if (($user.Antecedent.Domain -ne $user.Antecedent.PSComputerName) -and ($user.Antecedent.Name -ne $env:username) ) 
+                        {
+                            $obj = New-Object -TypeName PSCustomObject -Property @{'ComputerName' = $user.Antecedent.PSComputerName
+                                'Name' = $user.Antecedent.Name
+                                'Domain' = $user.Antecedent.Domain}
+                            Write-Output $obj
+                        }
                     }
+                }
             }
         }
         catch
