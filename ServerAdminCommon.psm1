@@ -301,7 +301,7 @@ function Get-ADSubnet{
     Process{
         #First loop for every IP address entered as a parameter.
         foreach ($IP in $IPAddress){
-         $Sites = (get-adobject -filter 'ObjectClass -eq "site"' -SearchBase $Configuration -Properties siteObjectBL) | where {$_.siteObjectBL -like ("*" + $IP)}#).siteObjectBL
+         $Sites = (get-adobject -filter 'ObjectClass -eq "site"' -SearchBase $Configuration -Properties siteObjectBL) | Where-Object {$_.siteObjectBL -like ("*" + $IP)}#).siteObjectBL
            #Next we loop through the all of the possible return sites. This allows us to separate them in pipeline output for single objects.
             foreach ($Site in $Sites){
             #One more loop to go through all of the subnets that return in each site object. They are nested arrays, so this part separates each IP address to make clean pipeline output.
