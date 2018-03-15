@@ -791,15 +791,26 @@ function Get-Netstat {
     [CmdletBinding(HelpUri = 'https://luisrorta.com/')]
     Param (
         # Enter a valid computer Name
-        [Parameter(Position=0)]
+        [Parameter(Mandatory=$False,
+                    Position=0)]
         [Alias("p1")] 
-        [string[]]$Computername = "LocalHost"
+        [string[]]$Computername = "LocalHost",
+        [Parameter(Mandatory=$false,
+                    Position=1,
+                    ParameterSetName='Listening')]
+        [ValidateSet("LISTENING", "ESTABLISHED", "TIME_WAIT", "*")]
+        $State = "*",
+        [Parameter(Mandatory=$False,
+                    Position=2)]
+        [ValidateSet("InterNetwork", "InterNetworkV6", "*")]
+        $AddressFamily = "*"
     )
     
     process 
     {
         foreach ($Computer in $Computername) 
         {
+            Write-Verbose -Message "Connecting to $ComputerName to run Netstat. Will Return State $State and using AddressFamily $AddressFamily"
             Invoke-Command -ComputerName $Computer -ScriptBlock {
                 $Netstats = NETSTAT.EXE -ANO
                 for ($i = 4; $i -lt $Netstats.Count; $i++) 
@@ -808,27 +819,187 @@ function Get-Netstat {
                     if ($split[0] -eq "TCP")
                     {
                         $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
-                                                                           LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
-                                                                           LocalPort = $split[1].split(":")[-1]
-                                                                           RemoteAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
-                                                                           RemotePort = $split[2].split(":")[-1]
+                                                                           LocalAddress = [IPAddress]($split[1].Substring(0,$split[1].lastindexof(":")))
+                                                                           LocalPort = [int]($split[1].split(":")[-1])
+                                                                           RemoteAddress = [IPAddress]($split[2].Substring(0,$split[2].lastindexof(":")))
+                                                                           RemotePort = [int]($split[2].split(":")[-1])
                                                                            State = $split[3]
                                                                            ProcessName = (Get-Process -Id $split[4]).Name
-                                                                           ProcessID = $split[4]}
+                                                                           ProcessID = [int]($split[4])}
                     }
                     if ($split[0] -eq "UDP"){
                         $obj = new-object -typename pscustomobject -Property @{Proto = $split[0]
-                                                                           LocalAddress = $split[1].Substring(0,$split[1].lastindexof(":"))
-                                                                           LocalPort = $split[1].split(":")[-1]
-                                                                           RemoteAddress = $split[2].Substring(0,$split[2].lastindexof(":"))
-                                                                           RemotePort = $split[2].split(":")[-1]
-                                                                           State = $null
+                                                                           LocalAddress = [IPAddress]($split[1].Substring(0,$split[1].lastindexof(":")))
+                                                                           LocalPort = [int]($split[1].split(":")[-1])
+                                                                           RemoteAddress = [IPAddress]$IP = "0.0.0.0"
+                                                                           RemotePort = 0
+                                                                           State = "LISTENING"
                                                                            ProcessName = (Get-Process -Id $Split[3]).Name
-                                                                           ProcessID = $split[4]}
+                                                                           ProcessID = [int]($split[4])}
                     }
-                    write-output $obj
+                    #$Filter = {$_.ProcessName -ne "System" -and $_.ProcessName -ne "svchost" -and $_.ProcessName -ne "RouterNT" -and $_.ProcessName -ne "wininit" -and $_.ProcessName -ne "lsass"}   
+                    Write-Output $obj | Where-Object -FilterScript {$_.State -like $Using:State -and $_.LocalAddress.AddressFamily -like $Using:AddressFamily }
                 }  
             }
         }
+    }
+}
+
+ 
+function ConvertTo-ACLMapping {
+    <#
+.SYNOPSIS
+    Short description
+.DESCRIPTION
+    Long description
+.EXAMPLE
+    Example of how to use this cmdlet
+.EXAMPLE
+    Another example of how to use this cmdlet
+.INPUTS
+    Inputs to this cmdlet (if any)
+.OUTPUTS
+    Output from this cmdlet (if any)
+.NOTES
+    General notes
+.COMPONENT
+    The component this cmdlet belongs to
+.ROLE
+    The role this cmdlet belongs to
+.FUNCTIONALITY
+    The functionality that best describes this cmdlet
+#>
+    [CmdletBinding(DefaultParameterSetName='Parameter Set 1',
+                   SupportsShouldProcess=$true,
+                   PositionalBinding=$false,
+                   HelpUri = 'http://www.microsoft.com/',
+                   ConfirmImpact='Medium')]
+    [Alias()]
+    [OutputType([String])]
+    Param (
+        # Param1 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [IPAddress[]]$LocalAddress,
+        # Param2 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Int[]]$LocalPort,
+        #Param4 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [IPAddress[]]$RemoteAddress,
+        # Param5 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Int[]]$RemotePort,
+        # Param5 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [String[]]$Proto,
+        # Param6 help description
+        [Parameter(Mandatory=$true,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Alias("ProcessName")]
+        [String[]]$Name,
+        # Param7 help description
+        [Parameter(Mandatory=$false)]
+        [String]$Direction = "Inbound"
+    )
+    
+    begin {
+
+    }
+    
+    process {
+        for ($i = 0; $i -lt $LocalPort.Count; $i++) {
+
+            Write-Output "netsh advfirewall firewall add rule name=`"$($Name[$i])`" dir=in action=allow protocol=$($Proto[$i]) localport=$($LocalPort[$i])"
+        }
+    }
+    
+    end {
+    }
+}
+
+<#
+.SYNOPSIS
+    Short description
+.DESCRIPTION
+    Long description
+.EXAMPLE
+    Example of how to use this cmdlet
+.EXAMPLE
+    Another example of how to use this cmdlet
+.INPUTS
+    Inputs to this cmdlet (if any)
+.OUTPUTS
+    Output from this cmdlet (if any)
+.NOTES
+    General notes
+.COMPONENT
+    The component this cmdlet belongs to
+.ROLE
+    The role this cmdlet belongs to
+.FUNCTIONALITY
+    The functionality that best describes this cmdlet
+#>
+function Verb-Noun {
+    [CmdletBinding(DefaultParameterSetName='Parameter Set 1',
+                   SupportsShouldProcess=$true,
+                   PositionalBinding=$false,
+                   HelpUri = 'http://www.microsoft.com/',
+                   ConfirmImpact='Medium')]
+    [Alias()]
+    [OutputType([String])]
+    Param (
+        # Param1 help description
+        [Parameter(Mandatory=$true,
+                   Position=0,
+                   ValueFromPipeline=$true,
+                   ValueFromPipelineByPropertyName=$true,
+                   ValueFromRemainingArguments=$false, 
+                   ParameterSetName='Parameter Set 1')]
+        [ValidateNotNull()]
+        [ValidateNotNullOrEmpty()]
+        [ValidateCount(0,5)]
+        [ValidateSet("sun", "moon", "earth")]
+        [Alias("p1")] 
+        $Param1,
+        
+        # Param2 help description
+        [Parameter(ParameterSetName='Parameter Set 1')]
+        [AllowNull()]
+        [AllowEmptyCollection()]
+        [AllowEmptyString()]
+        [ValidateScript({$true})]
+        [ValidateRange(0,5)]
+        [int]
+        $Param2,
+        
+        # Param3 help description
+        [Parameter(ParameterSetName='Another Parameter Set')]
+        [ValidatePattern("[a-z]*")]
+        [ValidateLength(0,15)]
+        [String]
+        $Param3
+    )
+    
+    begin {
+    }
+    
+    process {
+        if ($pscmdlet.ShouldProcess("Target", "Operation")) {
+            
+        }
+    }
+    
+    end {
     }
 }
