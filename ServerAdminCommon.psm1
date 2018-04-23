@@ -426,8 +426,7 @@ function Get-ADPrinter
         {
             try 
             {
-                    $Print = "*$Print"
-                    $DN = Get-ADObject -Filter {ObjectClass -eq "printQueue" -and Name -like $Print} -Properties printerName,serverName,portName,uNCName,driverName,location
+                    $DN = Get-ADObject -Filter {ObjectClass -eq "printQueue" -and PrinterName -like $Print} -Properties printerName,serverName,portName,uNCName,driverName,location
                     foreach ($D in $DN)
                     {
                         $properties = @{'Printer'=$D.printerName
