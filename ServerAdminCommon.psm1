@@ -10,9 +10,9 @@ function Get-OpenFile{
 .EXAMPLE
    Get-OpenFiles -ComputerName fileserver.contoso.com -FileName "Word.doc"
 .EXAMPLE
-   Get-OpenFiles -ComputerName Fileserver1, Fileserver2, Fileserver3 -FileName "reports"
+   Get-OpenFiles -ComputerName Fileserver1, Fileserver2, Fileserver3 -FileName "*reports*"
 .EXAMPLE
-   Get-ADComputer fileserver1 | Select-Object -Property DNSHostName | Get-OpenFiles -FileName "docx"
+   Get-ADComputer fileserver1 | Select-Object -Property DNSHostName | Get-OpenFiles -FileName "*.docx"
 #>
     [CmdletBinding(HelpUri = 'https://luisrorta.com/2017/01/21/get-openfiles/')]
     param (
@@ -22,7 +22,7 @@ function Get-OpenFile{
                     ValueFromPipelineByPropertyName=$true,
                     Position = 0)]
         [Alias('Hostname','DNSHostName')]
-        [string[]]$Computername,
+        [string[]]$ComputerName,
 
         # Filename or part of filename. Single value only.
         [Parameter(Mandatory=$false,
@@ -32,26 +32,12 @@ function Get-OpenFile{
     Process{
     foreach ($Computer in $Computername){
                 try{
-                    openfiles.exe /query /s $Computer /fo csv /V | Out-File -Force $env:TEMP\openfiles.csv -ErrorAction Stop
-                    $Files = Import-CSV $env:TEMP\openfiles.csv
+                    $Files = $Files = openfiles.exe /query /s $ComputerName /fo csv /V | ConvertFrom-Csv -ErrorAction Stop
                         foreach ($File in $Files){
-                            $properties = @{'Hostname'=$Computer
-                                            'AccessedBy'=$File."Accessed By"
-                                            'Locks'=$File."#Locks"
-                                            'OpenMode'=$File."Open Mode"
-                                            'File'=$File."Open File (Path\executable)"}
-                            $obj = New-Object -TypeName PSObject -Property $properties -ErrorAction Stop
-                            
-                            Write-Output $obj | Where-Object {$obj.File -match $FileName}
+                            $File | Where-Object {$PSItem.'Open File (Path\executable)' -like $FileName}
                         }
-                    Remove-Item $env:TEMP\openfiles.csv
                 }
                 catch{
-                    $properties = @{'Hostname'=$Computer
-                                    'AccessedBy'=$Null
-                                    'Locks'=$Null
-                                    'OpenMode'=$Null
-                                    'File'=$Null}
                     Write-Warning "Error getting open files."
                 }
        }
