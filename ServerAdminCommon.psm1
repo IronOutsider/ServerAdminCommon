@@ -830,8 +830,6 @@ function Get-OpenFile{
             }
         }
     }
-    
-     
     function ConvertTo-ACLMapping {
         <#
     .SYNOPSIS
@@ -913,26 +911,55 @@ function Get-OpenFile{
         end {
         }
     }
+    function Get-DiskPartList {
+        [CmdletBinding()]
+        Param (
+            # Enter a computername
+            [Parameter(Mandatory=$false,
+                       Position=0,
+                       ValueFromPipeline=$true,
+                       ValueFromPipelineByPropertyName=$true,
+                       ValueFromRemainingArguments=$false)]
+            [string[]]
+            $ComputerName = 'localhost'
+        )
+        process {
+            foreach ($Computer in $ComputerName) 
+            {
+                Invoke-Command -ComputerName $Computer -ScriptBlock {
+                    #Creating a file for Diskpart to scoop up and run the script. Diskpart does not appear to take direct arguments in switches like a "normal" tool.
+                    New-Item -Path $env:TEMP\diskpartscript.txt -ItemType File -Value "List Disk" | Out-Null
+                    $DiskPartResult = diskpart.exe /s $env:Temp\diskpartscript.txt
+                    
+                    #Now I'm going to try and figure out where to start splitting the array. Doing this because different diskpart versions return different arrays.
+                    #My assumption is that diskpart will always return at least 2 -- characters.
+                    $LinePattern = $DiskPartResult | select-string -Pattern "--"
     
-    <#
-    .SYNOPSIS
-        Short description
-    .DESCRIPTION
-        Long description
-    .EXAMPLE
-        Example of how to use this cmdlet
-    .EXAMPLE
-        Another example of how to use this cmdlet
-    .INPUTS
-        Inputs to this cmdlet (if any)
-    .OUTPUTS
-        Output from this cmdlet (if any)
-    .NOTES
-        General notes
-    .COMPONENT
-        The component this cmdlet belongs to
-    .ROLE
-        The role this cmdlet belongs to
-    .FUNCTIONALITY
-        The functionality that best describes this cmdlet
-    #>
+                    #This neat little trick returns the index of where we found the line pattern. Then, I just add 1 to it and start the for loop.
+                    $ArrayStart = [array]::IndexOf($DiskPartResult,$LinePattern) + 1
+    
+                    #Man, I really hope that position 7 is always the start of the disks listed in the array.
+                    for ($i = $ArrayStart; $i -lt $DiskPartResult.Count; $i++) 
+                    {
+                        #This replaces any instance of 2 spaces or more with a comma then splits based on that comma. really hacky, but it works.
+                        $Split = ($DiskPartResult[$i] -replace '\s{2,}',',').Split(',')
+                        #Got to get me some booleans from those asterisks
+                        $Dynamic = if ($Split[5]){$true}else {$false}
+                        $GPT = if ($Split[6]){$true}else {$false}
+                        #Create an object and output it to pipeline.
+                        [PSCustomObject]@{
+                            Computer = $env:COMPUTERNAME
+                            Disk = $Split[1]
+                            Status = $Split[2]
+                            Size = $Split[3]
+                            Free = $Split[4]
+                            Dynamic = $Dynamic
+                            GPT = $GPT
+                        }
+                    }
+                    #Cleanup that file now.
+                    Remove-Item $env:TEMP\diskpartscript.txt
+                }
+            }
+        }
+    }
